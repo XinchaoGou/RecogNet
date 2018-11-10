@@ -74,11 +74,7 @@ def mat_1_to_str(mat):
     _str =str(int(_b_str,2))
     return _str
 
-# test1
-# test2
-# test3 本地commit
-# test4 本地commit测试2
-# test5 远程push
+# test yining push
 #
 
 # 将字符串解码为矩阵
