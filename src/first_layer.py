@@ -116,6 +116,9 @@ def generate_patterns():
 blocks = split_block(img, 3)
 p = zncc(blocks[0][0],pattern)
 
+print(p)
+# test liuyining locla commit
+
 # patterns = generate_patterns()
 # p2 = ''
 # for i in range(9):
