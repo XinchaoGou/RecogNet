@@ -118,6 +118,7 @@ p = zncc(blocks[0][0],pattern)
 
 print(p)
 # test liuyining locla commit
+# test2 push to remote
 
 # patterns = generate_patterns()
 # p2 = ''
