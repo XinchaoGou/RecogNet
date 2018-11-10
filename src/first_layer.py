@@ -75,6 +75,7 @@ def mat_1_to_str(mat):
     return _str
 
 # test yining push
+# test yining github 客户端
 #
 
 # 将字符串解码为矩阵
