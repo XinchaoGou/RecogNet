@@ -74,24 +74,21 @@ def mat_1_to_str(mat):
     _str =str(int(_b_str,2))
     return _str
 
-# test yining push
-# test yining github 客户端
-#
 
-# 将字符串解码为矩阵
+
+# 将二进制字符串解码为矩阵
 def str_to_mat(_str,_k):
-    # _b_str = bin(int(_str))[2:]
     _len = len(_str)
-    _block_size = _len//9
+    _block_n = dim * dim
+    _block_size = _len//_block_n
     _mats = []
     if _k == 1:
         _mats = [[_str[dim * i + j] for j in range(dim)] for i in range(dim)]
     else:
-        _block_n = dim*dim
+        # 把二进制字符串分成9(dim * dim)块，迭代到低一层解码为字符矩阵
         _str_s = [ _str[ (k*_block_n) : (k*_block_n + _block_size)] for k in range(_block_n)]
         _mats = [[ str_to_mat(_str_s[dim*i + j], _k -1) for j in range(dim)] for i in range(dim)]
     return _mats
-
 
 # 生成模版 patterns = generate_patterns()
 # 生成第1层的模版"二进制字符串"
@@ -110,10 +107,10 @@ def generate_patterns():
 
 
 
-blocks = split_block(img, 3)
-p = zncc(blocks[0][0],pattern)
+# blocks = split_block(img, 3)
+# p = zncc(blocks[0][0],pattern)
 
-print(p)
+# print(p)
 # test liuyining locla commit
 # test2 push to remote
 # test3 push to origin by_yining
@@ -133,11 +130,6 @@ print(p)
 # b = str_to_mat(a_str,1)
 # c = ord(a[1])
 
-# test master
-# test 新超
-# test 上传
-# test github 客户端
-# test ignore
 
 
 
