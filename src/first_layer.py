@@ -74,6 +74,8 @@ def mat_1_to_str(mat):
     _str =str(int(_b_str,2))
     return _str
 
+# test
+
 # 将字符串解码为矩阵
 def str_to_mat(_str,_k):
     # _b_str = bin(int(_str))[2:]
