@@ -1,7 +1,7 @@
 import os
 import struct
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 """
 TRAINING SET LABEL FILE (train-labels-idx1-ubyte):
@@ -45,20 +45,34 @@ def load_mnist(path='../trainData', kind='train'):
     return images, labels
 
 
-X_train, y_train = load_mnist('../trainData', kind='train')
+class MinstData(object):
 
-fig, ax = plt.subplots(
-    nrows=2,
-    ncols=5,
-    sharex=True,
-    sharey=True, )
+    x_train, y_train = load_mnist('../trainData', kind='train')
 
-ax = ax.flatten()
-for i in range(10):
-    img = X_train[y_train == i][0].reshape(28, 28)
-    ax[i].imshow(img, cmap='Greys', interpolation='nearest')
+    def get_data(self, _num, _index):
+        data = self.x_train[self.y_train == _num][_index].reshape(28, 28)
+        return data
 
-ax[0].set_xticks([])
-ax[0].set_yticks([])
-plt.tight_layout()
-plt.show()
+    def get_length(self, _num):
+        length = len(self.x_train[self.y_train == _num])
+        return length
+
+# a=MinstData()
+# a_data=a.get_data(5, 255)
+# length=a.get_length(6)
+
+# fig, ax = plt.subplots(
+#     nrows=2,
+#     ncols=5,
+#     sharex=True,
+#     sharey=True, )
+#
+# ax = ax.flatten()
+# for i in range(10):
+#     img = X_train[y_train == i][0].reshape(28, 28)
+#     ax[i].imshow(img, cmap='Greys', interpolation='nearest')
+#
+# ax[0].set_xticks([])
+# ax[0].set_yticks([])
+# plt.tight_layout()
+# plt.show()
