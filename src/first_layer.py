@@ -164,6 +164,12 @@ def static_first_layer(_num , f_stop = 10):
             _current_key_list[f_index] = _t_dic_list[f_index][0]
             if _current_key_list[f_index] != _pre_key_list[f_index]:
                 _key = False
+        # 更新累计统计模版
+        # p_dic已经是前 i 个样本的累计频次，直接覆盖即可
+        sort_dic = show_most_patterns(p_dic, f_stop, r_type = 'dict')
+        print('前个'+ str(i+1) +'样本累计频次')
+        _save(sort_dic)
+
         # 如果前 f_stop 个特征完全相同，则停止训练
         if not _key:
             _pre_key_list = _current_key_list[:]
@@ -226,18 +232,15 @@ def _list_to_dict(_list):
 
 start = time.time()
 
-f_stop_num = 10
+f_stop_num = 100
 p_dic = static_first_layer(1, f_stop_num)
 sort_dic = show_most_patterns(p_dic, f_stop_num, 'dict', True)
+_save(sort_dic)
+# my_dic = _load()
+_cDict_to_allDict(sort_dic)
 
 end = time.time()
-
 print('运行时间' + str(end - start))
-
-_save(sort_dic)
-my_dic = _load()
-_cDict_to_allDict(my_dic)
-
 
 
 
