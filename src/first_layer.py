@@ -1,6 +1,9 @@
 import numpy as np
 import cmath as cm
+import json
 import time
+import os
+
 from read_data import MinstData
 
 dim = 3
@@ -142,10 +145,8 @@ def static_first_layer(_num , f_stop = 10):
                         p_max_index = p_index
 
                 _max_pattern_str = patterns_str[p_max_index]
-                if _max_pattern_str in p_dic:
-                    p_dic[_max_pattern_str] += 1
-                else:
-                    p_dic[_max_pattern_str] = 1
+                # dit.get 优化
+                p_dic[_max_pattern_str] = p_dic.get(_max_pattern_str,0) +1
 
         # 按频次降序排列的样本
         _t_dic = show_most_patterns(p_dic, f_stop)
@@ -165,8 +166,8 @@ def static_first_layer(_num , f_stop = 10):
 
     return p_dic
 
-# 打印出现频次最多的n个模版
-def show_most_patterns(p_dic, n, show=False):
+# 按频次降序排列，show=True 时，打印出现频次最多的n个模版
+def show_most_patterns(p_dic, n = 10, r_type = 'list',show=False):
     sort_dic = sorted(p_dic.items(), key=lambda item: item[1], reverse=True)
     if show :
         for i in range(n):
@@ -175,15 +176,61 @@ def show_most_patterns(p_dic, n, show=False):
             for j in range(3):
                 print(_mat[j])
             print('\n')
+
+    # 默认返回list，按需返回dict
+    if r_type =='dict':
+        return {sort_dic[i][0]: sort_dic[i][1] for i in range(len(sort_dic))}
+
     return sort_dic
 
-f_stop_num = 15
-start = time.time()
-p_dic = static_first_layer(1,f_stop_num)
-sort_dic = show_most_patterns(p_dic, f_stop_num, True)
-end = time.time()
+# 保存频次统计的数据到文件
+def _save(m_dic, _file_name = 'sort_dic.txt'):
+    with open(_file_name, 'w') as openfile:
+        json.dump(m_dic, openfile)
+        print('已存储到文件'+_file_name+'！')
+    return
 
-print(str(end - start))
+# 加载频次统计文件到数据
+def _load(_file_name = 'sort_dic.txt'):
+    with open(_file_name, 'rb') as loadfile:
+        load_dic = json.load(loadfile)
+        print('已加载文件'+_file_name+'！')
+    return load_dic
+
+# 增加当前频次统计字典的数据 到 总的频次统计数据
+def _cDict_to_allDict(m_dic, _all_file_name = 'all_frequent_dict.txt'):
+
+    _all_frequent_dict = {}
+    if os.path.exists('all_frequent_dict.txt'):
+        _all_frequent_dict = _load(_all_file_name)
+
+    for key, value in m_dic.items():
+        _all_frequent_dict[key]= _all_frequent_dict.get(key,0) + value
+
+    # 保存新的总频次数据
+    _save(_all_frequent_dict, _all_file_name)
+    return
+
+start = time.time()
+
+f_stop_num = 3
+# m_dic = []
+# for i in range(1):
+#     p_dic = static_first_layer(i, f_stop_num)
+#     sort_dic = show_most_patterns(p_dic, f_stop_num, True)
+#     # m_dic.append(sort_dic)
+# end = time.time()
+#
+# print(str(end - start))
+
+p_dic = static_first_layer(1, f_stop_num)
+sort_dic = show_most_patterns(p_dic, f_stop_num, 'dict', True)
+
+_save(sort_dic)
+my_dic = _load()
+_cDict_to_allDict(my_dic)
+
+
 
 
 
