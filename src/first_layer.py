@@ -121,7 +121,7 @@ def static_first_layer(_num , f_stop = 10):
     mData = MinstData()
     # 模版频次统计字典
     p_dic = {}
-    f_dic = ['' for i in range(f_stop)]
+    _pre_key_list = ['' for i in range(f_stop)]
     # 训练样本数
     # _n_len = 100
     _n_len = mData.get_length(_num)
@@ -148,18 +148,25 @@ def static_first_layer(_num , f_stop = 10):
                 # dit.get 优化
                 p_dic[_max_pattern_str] = p_dic.get(_max_pattern_str,0) +1
 
-        # 按频次降序排列的样本
-        _t_dic = show_most_patterns(p_dic, f_stop)
-        _t_patterns = ['' for i in range(f_stop)]
-        # 频次最高的，前 f_stop 个特征
+        # 累计前i个样本，按频次降序排列的特征
+        _t_dic_list = show_most_patterns(p_dic, f_stop)
+
+        # 累计前 i 个样本，出现过的 不同特征 的总数
+        _t_stop_len = min(len(_t_dic_list), f_stop, len(_pre_key_list))
+
+        _current_key_list = ['' for i in range(_t_stop_len)]
+
+        # 比较累计 i 个的频次统计与累计 i-1 个样本的频次统计
+        # 频次最高的，前 _t_stop_len 个特征，是否完全一致
+
         _key = True
-        for f_index in range(f_stop):
-            _t_patterns[f_index] = _t_dic[f_index][0]
-            if _t_patterns[f_index] != f_dic[f_index]:
+        for f_index in range(_t_stop_len):
+            _current_key_list[f_index] = _t_dic_list[f_index][0]
+            if _current_key_list[f_index] != _pre_key_list[f_index]:
                 _key = False
         # 如果前 f_stop 个特征完全相同，则停止训练
         if not _key:
-            f_dic = _t_patterns[:]
+            _pre_key_list = _current_key_list[:]
         else:
             print('计算了' + str(i) + '个样本\n')
             return p_dic
@@ -179,29 +186,29 @@ def show_most_patterns(p_dic, n = 10, r_type = 'list',show=False):
 
     # 默认返回list，按需返回dict
     if r_type =='dict':
-        return {sort_dic[i][0]: sort_dic[i][1] for i in range(len(sort_dic))}
+        return _list_to_dict(sort_dic)
 
     return sort_dic
 
 # 保存频次统计的数据到文件
-def _save(m_dic, _file_name = 'sort_dic.txt'):
+def _save(m_dic, _file_name = '../dict/sort_dic.txt'):
     with open(_file_name, 'w') as openfile:
         json.dump(m_dic, openfile)
         print('已存储到文件'+_file_name+'！')
     return
 
 # 加载频次统计文件到数据
-def _load(_file_name = 'sort_dic.txt'):
+def _load(_file_name = '../dict/sort_dic.txt'):
     with open(_file_name, 'rb') as loadfile:
         load_dic = json.load(loadfile)
         print('已加载文件'+_file_name+'！')
     return load_dic
 
 # 增加当前频次统计字典的数据 到 总的频次统计数据
-def _cDict_to_allDict(m_dic, _all_file_name = 'all_frequent_dict.txt'):
+def _cDict_to_allDict(m_dic, _all_file_name = '../dict/all_frequent_dict.txt'):
 
     _all_frequent_dict = {}
-    if os.path.exists('all_frequent_dict.txt'):
+    if os.path.exists(_all_file_name):
         _all_frequent_dict = _load(_all_file_name)
 
     for key, value in m_dic.items():
@@ -211,20 +218,21 @@ def _cDict_to_allDict(m_dic, _all_file_name = 'all_frequent_dict.txt'):
     _save(_all_frequent_dict, _all_file_name)
     return
 
+# 频次统计的list转换为dict
+# TODO 也许可以换成lambda
+def _list_to_dict(_list):
+    return {_list[i][0]: _list[i][1] for i in range(len(_list))}
+
+
 start = time.time()
 
-f_stop_num = 3
-# m_dic = []
-# for i in range(1):
-#     p_dic = static_first_layer(i, f_stop_num)
-#     sort_dic = show_most_patterns(p_dic, f_stop_num, True)
-#     # m_dic.append(sort_dic)
-# end = time.time()
-#
-# print(str(end - start))
-
+f_stop_num = 10
 p_dic = static_first_layer(1, f_stop_num)
 sort_dic = show_most_patterns(p_dic, f_stop_num, 'dict', True)
+
+end = time.time()
+
+print('运行时间' + str(end - start))
 
 _save(sort_dic)
 my_dic = _load()
