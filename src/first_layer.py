@@ -133,22 +133,8 @@ def static_first_layer(_num , f_stop = 10):
         blocks = split_block(img, dim)
         n, m = _size(blocks)
 
-        for n_index in range(n):
-            for m_index in range(m):
-                p_max = 0
-                p_max_index = ''
-                _block = blocks[n_index][m_index]
-
-                for p_index in range(len(patterns)):
-                    _pattern = patterns[p_index]
-                    p = zncc(_block, _pattern)
-                    if p >= p_max:
-                        p_max = p
-                        p_max_index = p_index
-
-                _max_pattern_str = patterns_str[p_max_index]
-                # dit.get 优化
-                p_dic[_max_pattern_str] = p_dic.get(_max_pattern_str,0) +1
+        #将 计算的单个样本频次字典 与 历史的频次字典合并
+        p_dic = _single_image_dic(img, patterns_str, patterns, **p_dic)
 
         # 累计前i个样本，按频次降序排列的特征
         _t_dic_list = show_most_patterns(p_dic, f_stop)
@@ -202,19 +188,24 @@ def show_most_patterns(p_dic, n = 10, r_type = 'list',show=False):
 def _save(m_dic, _file_name = '../dict/sort_dic.txt'):
     with open(_file_name, 'w') as openfile:
         json.dump(m_dic, openfile)
-        print('已存储到文件'+_file_name+'！')
+        print('已更新文件'+_file_name+'！')
     return
 
-# 加载频次统计文件到数据
+# 加载 频次统计文件 到 字典数据
 def _load(_file_name = '../dict/sort_dic.txt'):
-    with open(_file_name, 'rb') as loadfile:
-        load_dic = json.load(loadfile)
-        print('已加载文件'+_file_name+'！')
+    if os.path.exists(_file_name):
+        with open(_file_name, 'rb') as loadfile:
+            load_dic = json.load(loadfile)
+            print('已加载文件'+_file_name+'！')
+    else:
+        print('加载' + _file_name + '失败！文件不存在！')
+        load_dic = {}
     return load_dic
 
 # 增加当前频次统计字典的数据 到 总的频次统计数据
 def _cDict_to_allDict(m_dic, _all_file_name = '../dict/all_frequent_dict.txt'):
 
+    # TODO 将检查文件是否存在放在函数内部
     _all_frequent_dict = {}
     if os.path.exists(_all_file_name):
         _all_frequent_dict = _load(_all_file_name)
@@ -231,12 +222,44 @@ def _cDict_to_allDict(m_dic, _all_file_name = '../dict/all_frequent_dict.txt'):
 def _list_to_dict(_list):
     return {_list[i][0]: _list[i][1] for i in range(len(_list))}
 
+# 传入图像 _img ，统计图像上各特征集 _patterns 中特征的频次字典
+# _pattern_strs 是特征 为字符串 形式的特征集，list类型
+# _patterns 是 特征 为矩阵 形式的特征集，list类型
+def _single_image_dic(_img, _pattern_strs, _patterns, **_pre_dic):
+    blocks = split_block(_img, dim)
+    n, m = _size(blocks)
+    # 特征频次统计字典,有则在原来基础上添加，无则输出当前图的统计字典
+    if _pre_dic is not None:
+        p_dic = _pre_dic
+    else:
+        p_dic = {}
+
+    for n_index in range(n):
+        for m_index in range(m):
+            p_max = 0
+            p_max_index = ''
+            _block = blocks[n_index][m_index]
+
+            for p_index in range(len(_patterns)):
+                _pattern = _patterns[p_index]
+                p = zncc(_block, _pattern)
+                if p >= p_max:
+                    p_max = p
+                    p_max_index = p_index
+
+            # 也可以用矩阵形式，或者字符串形式互相转换，但是考虑这样在大量调用时，计算量太大
+            # 所以这里直接索引来得到
+            _max_pattern_str = _pattern_strs[p_max_index]
+            # dit.get 优化
+            p_dic[_max_pattern_str] = p_dic.get(_max_pattern_str, 0) + 1
+    return p_dic
+
 
 start = time.time()
 
-f_stop_num = 100
+f_stop_num = 5
 
-for i in range(10):
+for i in range(2):
     p_dic = static_first_layer(i, f_stop_num)
     sort_dic = show_most_patterns(p_dic, f_stop_num, 'dict', True)
     _cDict_to_allDict(sort_dic)
@@ -248,6 +271,16 @@ for i in range(10):
 
 end = time.time()
 print('运行时间' + str(end - start))
+
+
+# patterns_str = generate_patterns()
+# patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+# img = MinstData().get_data(1, 1)
+# pre_dic = _load('../dict/sort_dic.txt')
+#
+# a_dic = _single_image_dic(img, patterns_str, patterns, **pre_dic)
+# c_dic = _single_image_dic(img, patterns_str, patterns)
+# b_dic = _single_image_dic(img, patterns_str, patterns, **pre_dic)
 
 
 
