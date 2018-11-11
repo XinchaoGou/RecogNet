@@ -1,26 +1,9 @@
 import numpy as np
 import cmath as cm
-import sys
+import time
+from read_data import MinstData
 
-# img = [[0, 0, 1, 0, 0],
-#        [0, 1, 0, 1, 0],
-#        [1, 0, 0, 0, 1],
-#        [0, 1, 0, 1, 0],
-#        [0, 0, 1, 0, 0]]
-
-# img = np.ones([5,5])*2
 dim = 3
-
-img = [[10, 6, 10, 3, 4],
-       [10, 6, 5, 8, 9],
-       [10, 6, 10, 13, 14],
-       [15, 16, 17, 18, 19],
-       [20, 21, 22, 23, 24]]
-
-
-pattern = [[0, 1, 0],
-           [0, 1, 0],
-           [0, 1, 0]]
 
 # 返回矩阵的大小
 # (n,m) = _size(img)
@@ -30,7 +13,6 @@ def _size(img):
     n = _image_size[0]
     m = _image_size[1]
     return n,m
-
 
 # 把图片分成len*len的小块,返回blocks
 # blocks = split_block(img, 3)
@@ -52,43 +34,27 @@ def zncc(block,pattern):
 
     for i in range(n):
         for j in range(m):
-            _s_I += block[i][j]
-            _s_I_2 += block[i][j]**2
-            _s_P += pattern[i][j]
-            _s_P_2 += pattern[i][j]**2
-            _s_IP += block[i][j] * pattern[i][j]
+            b_ij = block[i][j]
+            # p_ij = 1 if pattern[i][j] else -1
+            p_ij = pattern[i][j]
+            _s_I += b_ij
+            _s_I_2 += b_ij**2
+            _s_P += p_ij
+            _s_P_2 += p_ij**2
+            _s_IP += b_ij * p_ij
 
     N = n*m
-    dem = (N*_s_I_2 - _s_I**2)*(N*_s_P_2 - _s_P**2)
-    return abs((N*_s_IP - _s_I*_s_P)/cm.sqrt(dem)) if dem != 0 else 1
-
-# 将第1层的矩阵模版，转换为十进制数字的字符串
-def mat_1_to_str(mat):
-    (n, m) = _size(mat)
-
-    _b_str = ''
-    for i in range(n):
-        for j in range(m):
-            _b_str += str(int(bin(mat[i][j]), 2))
-
-    _str =str(int(_b_str,2))
-    return _str
-
-
-
-# 将二进制字符串解码为矩阵
-def str_to_mat(_str,_k):
-    _len = len(_str)
-    _block_n = dim * dim
-    _block_size = _len//_block_n
-    _mats = []
-    if _k == 1:
-        _mats = [[_str[dim * i + j] for j in range(dim)] for i in range(dim)]
+    d_I = N*_s_I_2 - _s_I**2
+    d_J = N*_s_P_2 - _s_P**2
+    if d_I == 0 and d_J != 0:
+        d_I = d_J
+    if d_I != 0 and d_J == 0:
+        d_J = d_I
+    if d_I == 0 and d_J == 0:
+        return 1
     else:
-        # 把二进制字符串分成9(dim * dim)块，迭代到低一层解码为字符矩阵
-        _str_s = [ _str[ (k*_block_n) : (k*_block_n + _block_size)] for k in range(_block_n)]
-        _mats = [[ str_to_mat(_str_s[dim*i + j], _k -1) for j in range(dim)] for i in range(dim)]
-    return _mats
+        dem = (d_I)*(d_J)
+    return abs((N*_s_IP - _s_I*_s_P)/cm.sqrt(dem))
 
 # 生成模版 patterns = generate_patterns()
 # 生成第1层的模版"二进制字符串"
@@ -101,34 +67,124 @@ def generate_patterns():
         _current_len = len(_p_str)
         _com_str = "".join('0' for i in range(_total - _current_len))
         return _com_str + _p_str
-    return [ _com_pattern(i) for i in range(2**((dim*dim)**_k))]
+    return [ _com_pattern(i) for i in range(2**((dim*dim)**_k -1))]
 
+# 将二进字符串转化为对应矩阵，目前只转化最底层
+# TODO 可能只是临时用 比如将'010010010' 解码为
+# [[0, 1, 0],
+#  [0, 1, 0],
+#  [0, 1, 0]]
+def str_1_to_mat(_str):
+    _mats = [[int(_str[dim * i + j]) for j in range(dim)] for i in range(dim)]
+    return _mats
 
+# 将二进制字符串解码为字符矩阵
+# 比如'010010010' 解码为
+# [['0','1','0'],
+#  ['0','1','0'],
+#  ['0','1','0']]
+def str_to_matstr(_str,_k):
+    _len = len(_str)
+    _block_n = dim * dim
+    _block_size = _len//_block_n
+    _mats = []
+    if _k == 1:
+        _mats = [[_str[dim * i + j] for j in range(dim)] for i in range(dim)]
+    else:
+        # 把二进制字符串分成9(dim * dim)块，迭代到低一层解码为字符矩阵
+        _str_s = [ _str[ (k*_block_n) : (k*_block_n + _block_size)] for k in range(_block_n)]
+        _mats = [[ str_to_matstr(_str_s[dim*i + j], _k -1) for j in range(dim)] for i in range(dim)]
+    return _mats
 
+# # 将第1层的矩阵模版，转换为十进制数字的字符串
+# def mat_1_to_str(mat):
+#     (n, m) = _size(mat)
+#
+#     _b_str = ''
+#     for i in range(n):
+#         for j in range(m):
+#             _b_str += str(int(bin(mat[i][j]), 2))
+#
+#     _str =str(int(_b_str,2))
+#     return _str
 
+# 统计第一层数字n，模版的频次
+# f_stop = 10 表示，新样本运算后，前10个频次最高的特征不变，则停止样本训练
+def static_first_layer(_num , f_stop = 10):
+    # 生成模版
+    patterns_str = generate_patterns()
+    patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+    # 读取数据
+    mData = MinstData()
+    # 模版频次统计字典
+    p_dic = {}
+    f_dic = ['' for i in range(f_stop)]
+    # 训练样本数
+    # _n_len = 100
+    _n_len = mData.get_length(_num)
 
-# blocks = split_block(img, 3)
-# p = zncc(blocks[0][0],pattern)
+    for i in range( _n_len):
+        img = mData.get_data(_num, i)
+        blocks = split_block(img, dim)
+        n, m = _size(blocks)
 
-# print(p)
-# test liuyining locla commit
-# test2 push to remote
-# test3 push to origin by_yining
+        for n_index in range(n):
+            for m_index in range(m):
+                p_max = 0
+                p_max_index = ''
+                _block = blocks[n_index][m_index]
 
-# patterns = generate_patterns()
-# p2 = ''
-# for i in range(9):
-#     p2 += patterns[i]
-# # for i in range(9):
-# #     p2 += p2
-# str1 = str_to_mat(p2,2)
-# print(str1[0][1])
+                for p_index in range(len(patterns)):
+                    _pattern = patterns[p_index]
+                    p = zncc(_block, _pattern)
+                    if p >= p_max:
+                        p_max = p
+                        p_max_index = p_index
 
-# a = mat_1_to_str(pattern)
-# a_str = bin(int(a))[2:]
-# a_str = '0' + a_str
-# b = str_to_mat(a_str,1)
-# c = ord(a[1])
+                _max_pattern_str = patterns_str[p_max_index]
+                if _max_pattern_str in p_dic:
+                    p_dic[_max_pattern_str] += 1
+                else:
+                    p_dic[_max_pattern_str] = 1
+
+        # 按频次降序排列的样本
+        _t_dic = show_most_patterns(p_dic, f_stop)
+        _t_patterns = ['' for i in range(f_stop)]
+        # 频次最高的，前 f_stop 个特征
+        _key = True
+        for f_index in range(f_stop):
+            _t_patterns[f_index] = _t_dic[f_index][0]
+            if _t_patterns[f_index] != f_dic[f_index]:
+                _key = False
+        # 如果前 f_stop 个特征完全相同，则停止训练
+        if not _key:
+            f_dic = _t_patterns[:]
+        else:
+            print('计算了' + str(i) + '个样本\n')
+            return p_dic
+
+    return p_dic
+
+# 打印出现频次最多的n个模版
+def show_most_patterns(p_dic, n, show=False):
+    sort_dic = sorted(p_dic.items(), key=lambda item: item[1], reverse=True)
+    if show :
+        for i in range(n):
+            _mat = str_1_to_mat(sort_dic[i][0])
+            print(sort_dic[i][0] + '\t频次\t' + str(sort_dic[i][1]))
+            for j in range(3):
+                print(_mat[j])
+            print('\n')
+    return sort_dic
+
+f_stop_num = 15
+start = time.time()
+p_dic = static_first_layer(1,f_stop_num)
+sort_dic = show_most_patterns(p_dic, f_stop_num, True)
+end = time.time()
+
+print(str(end - start))
+
 
 
 
