@@ -111,54 +111,40 @@ def str_to_matstr(_str,_k):
 #     _str =str(int(_b_str,2))
 #     return _str
 
+
+
 # 统计第一层数字n，模版的频次
+# _num 是当前计算数字
+# _patterns_str 是模版集的字符串形式
+# _patterns 是模版集的矩阵形式
+# mData 是训练样本的数据
 # f_stop = 10 表示，新样本运算后，前10个频次最高的特征不变，则停止样本训练
-def static_first_layer(_num , f_stop = 10):
-    # 生成模版
-    patterns_str = generate_patterns()
-    patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
-    # 读取数据
-    mData = MinstData()
+def static_first_layer(_num, _patterns_str, _patterns, mData = MinstData(), f_stop = 10):
     # 模版频次统计字典
     p_dic = {}
     _pre_key_list = ['' for i in range(f_stop)]
     # 训练样本数
-    # _n_len = 100
     _n_len = mData.get_length(_num)
-
     _file_name = '../dict/sort_dic_' + str(_num) +'.txt'
 
     for i in range( _n_len):
         img = mData.get_data(_num, i)
-        blocks = split_block(img, dim)
-        n, m = _size(blocks)
-
-        #将 计算的单个样本频次字典 与 历史的频次字典合并
-        p_dic = _single_image_dic(img, patterns_str, patterns, **p_dic)
-
-        # 累计前i个样本，按频次降序排列的特征
+        p_dic = _single_image_dic(img, _patterns_str, _patterns, **p_dic)
         _t_dic_list = show_most_patterns(p_dic, f_stop)
-
-        # 累计前 i 个样本，出现过的 不同特征 的总数
-        _t_stop_len = min(len(_t_dic_list), f_stop, len(_pre_key_list))
-
+        _t_stop_len = min(len(_t_dic_list), len(_pre_key_list), f_stop)
         _current_key_list = ['' for i in range(_t_stop_len)]
-
-        # 比较累计 i 个的频次统计与累计 i-1 个样本的频次统计
-        # 频次最高的，前 _t_stop_len 个特征，是否完全一致
 
         _key = True
         for f_index in range(_t_stop_len):
             _current_key_list[f_index] = _t_dic_list[f_index][0]
             if _current_key_list[f_index] != _pre_key_list[f_index]:
                 _key = False
-        # 更新累计统计模版
-        # p_dic已经是前 i 个样本的累计频次，直接覆盖即可
+
         sort_dic = show_most_patterns(p_dic, f_stop, r_type = 'dict')
-        print('前个'+ str(i+1) +'样本累计频次')
+
+        print('数字'+ str(_num) + ': 前 '+ str(i+1) + ' 个样本累计频次')
         _save(sort_dic, _file_name)
 
-        # 如果前 f_stop 个特征完全相同，则停止训练
         if not _key:
             _pre_key_list = _current_key_list[:]
         else:
@@ -205,10 +191,7 @@ def _load(_file_name = '../dict/sort_dic.txt'):
 # 增加当前频次统计字典的数据 到 总的频次统计数据
 def _cDict_to_allDict(m_dic, _all_file_name = '../dict/all_frequent_dict.txt'):
 
-    # TODO 将检查文件是否存在放在函数内部
-    _all_frequent_dict = {}
-    if os.path.exists(_all_file_name):
-        _all_frequent_dict = _load(_all_file_name)
+    _all_frequent_dict = _load(_all_file_name)
 
     for key, value in m_dic.items():
         _all_frequent_dict[key]= _all_frequent_dict.get(key,0) + value
@@ -218,13 +201,14 @@ def _cDict_to_allDict(m_dic, _all_file_name = '../dict/all_frequent_dict.txt'):
     return
 
 # 频次统计的list转换为dict
-# TODO 也许可以换成lambda
 def _list_to_dict(_list):
     return {_list[i][0]: _list[i][1] for i in range(len(_list))}
 
 # 传入图像 _img ，统计图像上各特征集 _patterns 中特征的频次字典
+# 如果有 _pre_dic 字段 则将 该样本频次字典 与 历史频次字典 合并
 # _pattern_strs 是特征 为字符串 形式的特征集，list类型
 # _patterns 是 特征 为矩阵 形式的特征集，list类型
+# 返回值是dic类型
 def _single_image_dic(_img, _pattern_strs, _patterns, **_pre_dic):
     blocks = split_block(_img, dim)
     n, m = _size(blocks)
@@ -254,33 +238,25 @@ def _single_image_dic(_img, _pattern_strs, _patterns, **_pre_dic):
             p_dic[_max_pattern_str] = p_dic.get(_max_pattern_str, 0) + 1
     return p_dic
 
+# 运行训练样本数据，生成频次字典
+# f_stop_num = 50 设定前50个特征渐进稳定的时候，停止当前数字训练，用于加速
+def _run_train_data(f_stop_num = 50):
+    start = time.time()
+    # 生成模版
+    patterns_str = generate_patterns()
+    patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+    for i in range(2):
+        p_dic = static_first_layer(i, patterns_str, patterns, f_stop=f_stop_num)
+        sort_dic = show_most_patterns(p_dic, f_stop_num, 'dict', True)
+        _cDict_to_allDict(sort_dic)
 
-start = time.time()
+    print('运行时间' + str(time.time() - start))
+    return
 
-f_stop_num = 5
-
-for i in range(2):
-    p_dic = static_first_layer(i, f_stop_num)
-    sort_dic = show_most_patterns(p_dic, f_stop_num, 'dict', True)
-    _cDict_to_allDict(sort_dic)
-# p_dic = static_first_layer(1, f_stop_num)
-# sort_dic = show_most_patterns(p_dic, f_stop_num, 'dict', True)
-# _save(sort_dic)
-# my_dic = _load()
-# _cDict_to_allDict(sort_dic)
-
-end = time.time()
-print('运行时间' + str(end - start))
+_run_train_data(5)
 
 
-# patterns_str = generate_patterns()
-# patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
-# img = MinstData().get_data(1, 1)
-# pre_dic = _load('../dict/sort_dic.txt')
-#
-# a_dic = _single_image_dic(img, patterns_str, patterns, **pre_dic)
-# c_dic = _single_image_dic(img, patterns_str, patterns)
-# b_dic = _single_image_dic(img, patterns_str, patterns, **pre_dic)
+
 
 
 
