@@ -244,6 +244,9 @@ def _single_image_dic(_img, _pattern_strs, _patterns, output_real_patterns = Fal
         p_dic = _pre_dic
     else:
         p_dic = {}
+    # TODO 看看能不能这样替代，应该是等价的，如果没参数，系统自动分配了 _pre_dic = {}
+    #     p_dic = _pre_dic
+
 
     if output_real_patterns:
         _p_real_patterns = [ [ '' for j in range(m)] for i in range(n)]
@@ -298,10 +301,9 @@ def fstr_to_index(_feature_str):
 # 计算全部 1 层特征之间的相似矩阵,大小为 512 * i
 # _all_f_mat[i][j]表示 特征i 与 特征j 的相似度
 # 返回 相似度的半矩阵
-# TODO 默认计算所有特征相似度，也可以只计算传入的特征基之间的相似度矩阵
+# TODO 默认计算所有特征相似度，也可以只计算传入的特征基之间的相似度矩阵,
+# 用的时候注意需要给 这组 传入的特征基建立一个索引的字典key是特征，value是对应相似矩阵的角标
 def _pattern_str_distance_mat(_patterns_str = generate_patterns()):
-    # 生成模版
-    # _patterns_str =
     _all_feature_num = len( _patterns_str)
     _all_f_mat = [[str_to_matstr_or_compare(_patterns_str[i], _patterns_str[j]) for j in range(i, _all_feature_num)] for i in range(_all_feature_num)]
     return _all_f_mat
@@ -311,15 +313,13 @@ def _pattern_str_distance_mat(_patterns_str = generate_patterns()):
 # 调用dis_from_mat(_str_1,_str_2,_all_f_mat, **dic)时，
 # 特征集是一部分，所以必须建立特征字符串 和到相似度矩阵对应索引 的字典
 def dis_from_mat(_str_1,_str_2,_all_f_mat, ** _dic):
-    # if _dic is not None:
-    #     ind_1 = _dic[_str_1]
-    #     ind_2 = _dic[_str_2]
-    # else:
-    #     ind_1 = fstr_to_index(_str_1)
-    #     ind_2 = fstr_to_index(_str_2)
 
-    ind_1 = fstr_to_index(_str_1)
-    ind_2 = fstr_to_index(_str_2)
+    if _dic == {}:
+        ind_1 = fstr_to_index(_str_1)
+        ind_2 = fstr_to_index(_str_2)
+    else:
+        ind_1 = _dic[_str_1]
+        ind_2 = _dic[_str_2]
 
     if ind_1 < ind_2:
         _min_ind, _max_ind = ind_1, ind_2
