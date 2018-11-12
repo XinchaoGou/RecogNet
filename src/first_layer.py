@@ -2,14 +2,16 @@ import numpy as np
 import cmath as cm
 import json
 import time
+import math
 import os
 
 from PIL import Image
 from read_data import MinstData
 
 dim = 3
-# pixel = 255
+pixel = 255
 pixel_half = 128
+img_size = 28
 
 # 返回矩阵的大小
 # (n,m) = _size(img)
@@ -155,7 +157,7 @@ def static_first_layer(_num, _patterns_str, _patterns, mData = MinstData(), f_st
 
     for i in range( _n_len):
         img = mData.get_data(_num, i)
-        p_dic = _single_image_dic(img, _patterns_str, _patterns, **p_dic)
+        p_dic = _single_image_dic_or_real_patterns(img, _patterns_str, _patterns, **p_dic)
         _t_dic_list = show_most_patterns(p_dic, f_stop)
         _t_stop_len = min(len(_t_dic_list), len(_pre_key_list), f_stop)
         _current_key_list = ['' for i in range(_t_stop_len)]
@@ -235,25 +237,22 @@ def _list_to_dict(_list):
 # _pattern_strs 是特征 为字符串 形式的特征集，list类型
 # _patterns 是 特征 为矩阵 形式的特征集，list类型
 # 返回值是dic类型,
-# 如果 output_real_patterns = True 则返回 图像在第一组基下的 第一层网络 (26*26) 大小的list
-def _single_image_dic(_img, _pattern_strs, _patterns, output_real_patterns = False, **_pre_dic):
+# 如果 output_real_patterns = True 则返回
+# 图像在第一组基下的 第一层网络 (26*26) 大小的list 和 每个神经元的概率（输出能量大小）
+def _single_image_dic_or_real_patterns(_img, _pattern_strs, _patterns, output_real_patterns = False, **_pre_dic):
     blocks = split_block(_img, dim)
     n, m = _size(blocks)
     # 特征频次统计字典,有则在原来基础上添加，无则输出当前图的统计字典
-    if _pre_dic is not None:
-        p_dic = _pre_dic
-    else:
-        p_dic = {}
-    # TODO 看看能不能这样替代，应该是等价的，如果没参数，系统自动分配了 _pre_dic = {}
-    #     p_dic = _pre_dic
-
+    # 如果没参数，系统自动分配了 _pre_dic = {}
+    p_dic = _pre_dic
 
     if output_real_patterns:
-        _p_real_patterns = [ [ '' for j in range(m)] for i in range(n)]
+        _blocks_f_strs = [ [ '' for j in range(m)] for i in range(n)]
+        _blocks_f_confidence = [[ 0. for j in range(m)] for i in range(n)]
 
     for n_index in range(n):
         for m_index in range(m):
-            p_max = 0
+            p_max = 0.
             p_max_index = ''
             _block = blocks[n_index][m_index]
 
@@ -266,11 +265,12 @@ def _single_image_dic(_img, _pattern_strs, _patterns, output_real_patterns = Fal
 
             _max_pattern_str = _pattern_strs[p_max_index]
             if output_real_patterns:
-                _p_real_patterns[n_index][m_index] = _max_pattern_str
+                _blocks_f_strs[n_index][m_index] = _max_pattern_str
+                _blocks_f_confidence[n_index][m_index]  = p_max
             # dit.get 优化
             p_dic[_max_pattern_str] = p_dic.get(_max_pattern_str, 0) + 1
     if output_real_patterns:
-        return _p_real_patterns
+        return _blocks_f_strs,_blocks_f_confidence
     return p_dic
 
 # 运行训练样本数据，生成频次字典
@@ -327,63 +327,144 @@ def dis_from_mat(_str_1,_str_2,_all_f_mat, ** _dic):
         _min_ind, _max_ind = ind_2, ind_1
     return _all_f_mat[_min_ind][_max_ind - _min_ind]
 
-# 将给定的特征，映射到给定的基中, 需要传入特征相似的半矩阵进行查找
+# 将给定的特征，映射到给定的基中, 需要传入对应的 特征相似半矩阵进行查找
+# 返回映射到的特征的str，同时返回该映射的操作的置信率
 def _update_feature(_fstr, _base_features_strs, _dis_mat):
 
     _p_list = [ dis_from_mat(_fstr, _base_features_strs[i], _dis_mat) for i in range(len(_base_features_strs))]
-    _index = _p_list.index(max(_p_list))
-    return _base_features_strs[_index]
+    _max_confidence = max(_p_list)
+    _index = _p_list.index(_max_confidence)
+    return _base_features_strs[_index], _max_confidence
 
-# TODO 将实际第一层网络，通过给定的一组特征基修正
 # 传入该层网络，传入一组特征基，传入特征相似半矩阵，用于查找特征相似度
 def _updat_layer(_layer, _base_features, _dis_mat):
     _size = len(_layer)
-    return [[_update_feature(_layer[i][j], _base_features, _dis_mat) for j in range(_size)] for i in range(_size)]
+    _updated_layer = [['' for j in range(_size)] for i in range(_size)]
+    _updated_layer_conf = [[0. for j in range(_size)] for i in range(_size)]
+    for i in range(_size):
+        for j in range(_size):
+            _new_feature_str, _max_confidence = _update_feature(_layer[i][j], _base_features, _dis_mat)
+            _updated_layer[i][j] = _new_feature_str
+            _updated_layer_conf[i][j] = _max_confidence
 
+    return _updated_layer, _updated_layer_conf
+
+# 根据网络层的输出以及每个神经元的置信概率，重建图像
+def _layer_to_img(_layer,_layer_p):
+    _re_img = [[0 for j in range(img_size)] for i in range(img_size)]
+    _size = len(_layer)
+    for i in range( _size):
+        for j in range(_size):
+            _pattern_str = _layer[i][j]
+            _pattern_probablity = _layer_p[i][j]
+            _pattern = str_1_to_mat(_pattern_str)
+            for n_index in range(dim):
+                for m_index in range(dim):
+                    # TODO 这里可以再结合每个特征的生成误差,特征映射误差,以及特征的频次比,为权重
+                    _re_img[i][j] += _pattern[n_index][m_index] * _pattern_probablity
+    return _re_img
+
+# 归一化图像
+def normalize(_img):
+    max_value = max(max(_img))
+    return [[_img[i][j]*pixel/max_value for j in range(img_size)] for i in range(img_size)]
 
 # 第一层修正，根据给定的基，生成修正图像
 # 根据前 _f_num 个特征为基
 # 数字 _num 如果给定用对应的特征，否则用全部训练的特征
 # TODO 未完成
 def _show_img(_img, _f_num = 10, _num = None):
-    # # 加载第一层特征字典为dist
-    # _frequent_dict = _load( _n_filename( _num)) if _num is not None else _load()
-    # _f_str_list = [ key for key in _frequent_dict]
-    # _f_patterns = [str_1_to_mat(_f_str_list[i]) for i in range(len(_f_str_list))]
-    #
-    # _pattern_strs = _f_str_list[0:_f_num]
-    # _patterns = _f_patterns[0:_f_num]
-    # layer_1 = _single_image_dic(_img, _pattern_strs, _patterns, output_real_patterns=True)
+    mData = MinstData()
+    num = 1
+    f_num = 100
+    img = mData.get_data(num, 0)
+    # 生成模版
+    patterns_str = generate_patterns()
+    patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+    dis_mat = _pattern_str_distance_mat(patterns_str)
+    # 第一层的实际模版,及对应概率
+    layer_1, Layer_1_p = _single_image_dic_or_real_patterns(img, patterns_str, patterns, output_real_patterns=True)
 
-    return _img
+    best_features_dic = _load(_n_filename(num))
+    best_features = [key for key in best_features_dic][0:f_num]
+
+    # 更新第一层
+    updated_layer,updated_layer_conf = _updat_layer(layer_1, best_features, dis_mat)
+
+    re_img = _layer_to_img(layer_1, Layer_1_p)
+
+    # 直接归一化的效果应该更好，可以反应每层神经网络对原始信息扭曲后的结果
+    n_img = normalize(re_img)
+    b_img = [[1 if re_img[i][j] > 4 else 0 for j in range(img_size)] for i in range(img_size)]
+    b_img = normalize(b_img)
+
+    show_img = n_img
+
+    for i in range(img_size):
+        for j in range(img_size):
+            img[i][j] = show_img[i][j]
+
+    Image.fromarray(img).show()
+    return img
+
+# TODO 根据样本，第一层网络的输出，计算频次统计图，与学习到的对应标签的频次统计图计算相似度
+# _dic 是降序排列的频次字典
+# _f_num 是前n个特征基
+# _pattern_strs 和 _patterns 是所有特征的
+def _p_img_to_tag(_img,_f_num, _pattern_strs, _patterns, _dic):
+    # 归一化前几个特征的频次
+    def normalize_value(_value_list):
+        _sum = sum(_value_list)
+        return [_value_list[i]/_sum for i in range(len(_value_list))]
+
+    dis_mat = _pattern_str_distance_mat()
+    # 计算单个样本的第一层网络实际输出
+    _sample_layer_1,_sample_layer_1_conf = _single_image_dic_or_real_patterns(_img, _pattern_strs, _patterns, output_real_patterns = True)
+
+    best_features = list(_dic.keys())[0:_f_num]
+    best_features_value = normalize_value(list(_dic.values())[0:_f_num])
+
+    _updated_layer, _updated_layer_conf = _updat_layer(_sample_layer_1, best_features, dis_mat)
+    # 根据每个区块实际投影误差，区块特征矫正误差，生成矫正后频次图
+    _updated_layer_dic ={}
+    _size = len(_updated_layer)
+    for i in range(_size):
+        for j in range(_size):
+            _key =  _updated_layer[i][j]
+            _real_project_confidence =  _sample_layer_1_conf[i][j]
+            _change_feature_confidence = _updated_layer_conf[i][j]
+            _updated_layer_dic[_key] = _updated_layer_dic.get(_key,0) + _real_project_confidence * _change_feature_confidence
+
+    # 矫正后的频次图和对应标签学习到的频次图相似度计算
+    # TODO 归一化频次图，用公式算概率
+    _sample_features = list(_updated_layer_dic.keys())[0:_f_num]
+    _sample_features_value = normalize_value(list(_updated_layer_dic.values())[0:_f_num])
+    for i in range(len(_sample_features)):
+        _updated_layer_dic[_sample_features[i]] = _sample_features_value[i]
+
+    _similarity = 0.
+    for i in range(len(best_features)):
+        _best_key = best_features[i]
+        _p_beast = best_features_value[i]
+        _p_sample = _updated_layer_dic.get(_best_key,0)
+        _similarity +=_p_beast * math.exp( -abs(_p_beast - _p_sample) )
+
+    return _similarity
 
 
-# _run_train_data(5)
+_run_train_data(100)
 
-
-
-
-# Image.fromarray(_show_img(img, _num =1)).show()
-
-mData = MinstData()
-num = 1
-f_num = 10
-img = mData.get_data(num, 0)
-# 生成模版
-patterns_str = generate_patterns()
-patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
-dis_mat = _pattern_str_distance_mat(patterns_str)
-# 第一层的实际模版
-layer_1 = _single_image_dic(img, patterns_str, patterns, output_real_patterns=True)
-
-best_features_dic = _load(_n_filename(num))
-best_features = [key for key in best_features_dic][0:f_num]
-
-
-# 更新第一层
-
-updated_layer = _updat_layer(layer_1, best_features, dis_mat)
-
+# mData = MinstData()
+# num = 1
+# f_num = 10
+# img = mData.get_data(1, 100)
+# # 生成模版
+# patterns_str = generate_patterns()
+# patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+# # 学习到的频次统计图
+# best_features_dic = _load(_n_filename(1))
+#
+# p = _p_img_to_tag(img, f_num, patterns_str, patterns, best_features_dic)
 
 
 
