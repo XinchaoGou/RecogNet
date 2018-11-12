@@ -71,7 +71,7 @@ def generate_patterns():
         _current_len = len(_p_str)
         _com_str = "".join('0' for i in range(_total - _current_len))
         return _com_str + _p_str
-    return [ _com_pattern(i) for i in range(2**((dim*dim)**_k -1))]
+    return [ _com_pattern(i) for i in range(2**((dim*dim)**_k))]
 
 # 将二进字符串转化为对应矩阵，目前只转化最底层
 # TODO 可能只是临时用 比如将'010010010' 解码为
@@ -299,15 +299,6 @@ def _pattern_str_distance_mat():
     _patterns_str = generate_patterns()
     _all_feature_num = len( _patterns_str)
     _all_f_mat = [[str_to_matstr_or_compare(_patterns_str[i], _patterns_str[j]) for j in range(i, _all_feature_num)] for i in range(_all_feature_num)]
-    # if (_str_1 is not None) and (_str_2 is not None):
-    #     # 因为第一层比较少，存一半矩阵所以要从特征的字符串先找出特征编号
-    #     ind_1 = fstr_to_index(_str_1)
-    #     ind_2 = fstr_to_index(_str_2)
-    #     if ind_1 < ind_2 :
-    #         _min_ind,_max_ind = ind_1,ind_2
-    #     else:
-    #         _min_ind, _max_ind = ind_2, ind_1
-    #     return _all_f_mat[_min_ind][_max_ind]
     return _all_f_mat
 
 # 查表两个特征之间距离,因为矩阵只有一半注意索引
@@ -342,7 +333,7 @@ def _show_img(_img, _f_num = 10, _num = None):
 
 mat = _pattern_str_distance_mat()
 str_1 = '000111000'
-str_2 = '011011011'
+str_2 = '100100100'
 dis = dis_from_mat(str_1,str_2,_all_f_mat = _pattern_str_distance_mat())
 
 
