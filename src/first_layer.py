@@ -290,10 +290,10 @@ def fstr_to_index(_feature_str):
     _str = '0b'+_feature_str
     return int(_str,2)
 
-# TODO
-# 只用计算一半,不是矩阵形式，第一行256个，第二行255个，很行依次递减一
-# 计算全部 1 层特征之间的相似矩阵,大小为 256 *256
+# 只用计算一半,不是矩阵形式，第一行 512 个，第二行 511 个，很行依次递减一
+# 计算全部 1 层特征之间的相似矩阵,大小为 512 * i
 # _all_f_mat[i][j]表示 特征i 与 特征j 的相似度
+# 返回 相似半矩阵
 def _pattern_str_distance_mat():
     # 生成模版
     _patterns_str = generate_patterns()
@@ -302,7 +302,8 @@ def _pattern_str_distance_mat():
     return _all_f_mat
 
 # 查表两个特征之间距离,因为矩阵只有一半注意索引
-def dis_from_mat(_str_1,_str_2,_all_f_mat = _pattern_str_distance_mat()):
+# 调用时 dis_from_mat(_str_1,_str_2,_all_f_mat)
+def dis_from_mat(_str_1,_str_2,_all_f_mat):
     ind_1 = fstr_to_index(_str_1)
     ind_2 = fstr_to_index(_str_2)
     print(ind_1,ind_2)
@@ -313,6 +314,18 @@ def dis_from_mat(_str_1,_str_2,_all_f_mat = _pattern_str_distance_mat()):
     print(_max_ind, _min_ind)
     return _all_f_mat[_min_ind][_max_ind - _min_ind]
     return
+
+# 将给定的特征，映射到给定的基中, 需要传入特征相似的半矩阵进行查找
+def _update_feature(_fstr, _base_features_strs, _dis_mat = _pattern_str_distance_mat()):
+
+    _p_list = [ dis_from_mat(_fstr, _base_features_strs[i], _dis_mat) for i in range(len(_base_features_strs))]
+    _index = _p_list.index(max(_p_list))
+    return _base_features_strs[_index]
+
+# TODO 将实际第一层网络，通过给定的一组特征基修正
+# 传入该层网络，传入修正
+# def _updat_layer(_layer, )
+
 
 # 第一层修正，根据给定的基，生成修正图像
 # 根据前 _f_num 个特征为基
@@ -331,28 +344,10 @@ def _show_img(_img, _f_num = 10, _num = None):
     return _img
 
 
-mat = _pattern_str_distance_mat()
-str_1 = '000111000'
-str_2 = '100100100'
-dis = dis_from_mat(str_1,str_2,_all_f_mat = _pattern_str_distance_mat())
-
-
 # _run_train_data(5)
-
-# mData = MinstData()
-# num = 1
-# f_num = 10
-# img = mData.get_data(num, 0)
-# # 生成模版
-# patterns_str = generate_patterns()
-# patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
-# layer_1 = _single_image_dic(img, patterns_str, patterns, output_real_patterns=True)
-# # 加载第一层特征字典为dist
-# _frequent_dict = _load(_n_filename(num)) if num is not None else _load()
-# _f_str_list = [key for key in _frequent_dict]
-# _f_patterns = [str_1_to_mat(_f_str_list[i]) for i in range(len(_f_str_list))]
-# _pattern_strs = _f_str_list[0:f_num]
-# _patterns = _f_patterns[0:f_num]
+str_1 = '000111000'
+strs = ['111101000', '000000000']
+b = _update_feature(str_1, strs)
 
 
 
