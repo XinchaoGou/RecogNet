@@ -8,6 +8,8 @@ from PIL import Image
 from read_data import MinstData
 
 dim = 3
+# pixel = 255
+pixel_half = 128
 
 # 返回矩阵的大小
 # (n,m) = _size(img)
@@ -48,17 +50,19 @@ def zncc(block,pattern):
             _s_IP += b_ij * p_ij
 
     N = n*m
-    d_I = N*_s_I_2 - _s_I**2
-    d_J = N*_s_P_2 - _s_P**2
-    if d_I == 0 and d_J != 0:
-        d_I = d_J
-    if d_I != 0 and d_J == 0:
-        d_J = d_I
-    if d_I == 0 and d_J == 0:
-        return 1
+    d_block = N*_s_I_2 - _s_I**2
+    d_Pattern = N*_s_P_2 - _s_P**2
+    if d_block == 0 and d_Pattern != 0:
+        d_block = d_Pattern
+    if d_block != 0 and d_Pattern == 0:
+        d_Pattern = d_block
+    if d_block == 0 and d_Pattern == 0:
+        # 均值低于一半则为0，高于一半则为1
+        _threshold = N * pixel_half
+        return 1 if ((_s_P == 0) and (_s_I< _threshold)) or ((_s_P > 0) and (_s_I > _threshold)) else 0
     else:
-        dem = (d_I)*(d_J)
-    return abs((N*_s_IP - _s_I*_s_P)/cm.sqrt(dem))
+        dem = (d_block)*(d_Pattern)
+    return (N*_s_IP - _s_I*_s_P)/cm.sqrt(dem)
 
 # 生成模版 patterns = generate_patterns()
 # 生成第1层的模版"二进制字符串"
@@ -231,7 +235,7 @@ def _list_to_dict(_list):
 # _pattern_strs 是特征 为字符串 形式的特征集，list类型
 # _patterns 是 特征 为矩阵 形式的特征集，list类型
 # 返回值是dic类型,
-# 如果 output_real_patterns = True 则返回 图像在第一组基下的 第一层网络
+# 如果 output_real_patterns = True 则返回 图像在第一组基下的 第一层网络 (26*26) 大小的list
 def _single_image_dic(_img, _pattern_strs, _patterns, output_real_patterns = False, **_pre_dic):
     blocks = split_block(_img, dim)
     n, m = _size(blocks)
@@ -293,38 +297,48 @@ def fstr_to_index(_feature_str):
 # 只用计算一半,不是矩阵形式，第一行 512 个，第二行 511 个，很行依次递减一
 # 计算全部 1 层特征之间的相似矩阵,大小为 512 * i
 # _all_f_mat[i][j]表示 特征i 与 特征j 的相似度
-# 返回 相似半矩阵
-def _pattern_str_distance_mat():
+# 返回 相似度的半矩阵
+# TODO 默认计算所有特征相似度，也可以只计算传入的特征基之间的相似度矩阵
+def _pattern_str_distance_mat(_patterns_str = generate_patterns()):
     # 生成模版
-    _patterns_str = generate_patterns()
+    # _patterns_str =
     _all_feature_num = len( _patterns_str)
     _all_f_mat = [[str_to_matstr_or_compare(_patterns_str[i], _patterns_str[j]) for j in range(i, _all_feature_num)] for i in range(_all_feature_num)]
     return _all_f_mat
 
 # 查表两个特征之间距离,因为矩阵只有一半注意索引
-# 调用时 dis_from_mat(_str_1,_str_2,_all_f_mat)
-def dis_from_mat(_str_1,_str_2,_all_f_mat):
+# 调用时 dis_from_mat(_str_1,_str_2,_all_f_mat) 计算全部特征集上的特征之间距离
+# 调用dis_from_mat(_str_1,_str_2,_all_f_mat, **dic)时，
+# 特征集是一部分，所以必须建立特征字符串 和到相似度矩阵对应索引 的字典
+def dis_from_mat(_str_1,_str_2,_all_f_mat, ** _dic):
+    # if _dic is not None:
+    #     ind_1 = _dic[_str_1]
+    #     ind_2 = _dic[_str_2]
+    # else:
+    #     ind_1 = fstr_to_index(_str_1)
+    #     ind_2 = fstr_to_index(_str_2)
+
     ind_1 = fstr_to_index(_str_1)
     ind_2 = fstr_to_index(_str_2)
-    print(ind_1,ind_2)
+
     if ind_1 < ind_2:
         _min_ind, _max_ind = ind_1, ind_2
     else:
         _min_ind, _max_ind = ind_2, ind_1
-    print(_max_ind, _min_ind)
     return _all_f_mat[_min_ind][_max_ind - _min_ind]
-    return
 
 # 将给定的特征，映射到给定的基中, 需要传入特征相似的半矩阵进行查找
-def _update_feature(_fstr, _base_features_strs, _dis_mat = _pattern_str_distance_mat()):
+def _update_feature(_fstr, _base_features_strs, _dis_mat):
 
     _p_list = [ dis_from_mat(_fstr, _base_features_strs[i], _dis_mat) for i in range(len(_base_features_strs))]
     _index = _p_list.index(max(_p_list))
     return _base_features_strs[_index]
 
 # TODO 将实际第一层网络，通过给定的一组特征基修正
-# 传入该层网络，传入修正
-# def _updat_layer(_layer, )
+# 传入该层网络，传入一组特征基，传入特征相似半矩阵，用于查找特征相似度
+def _updat_layer(_layer, _base_features, _dis_mat):
+    _size = len(_layer)
+    return [[_update_feature(_layer[i][j], _base_features, _dis_mat) for j in range(_size)] for i in range(_size)]
 
 
 # 第一层修正，根据给定的基，生成修正图像
@@ -345,28 +359,30 @@ def _show_img(_img, _f_num = 10, _num = None):
 
 
 # _run_train_data(5)
-str_1 = '000111000'
-strs = ['111101000', '000000000']
-b = _update_feature(str_1, strs)
+
 
 
 
 # Image.fromarray(_show_img(img, _num =1)).show()
 
-# mData = MinstData()
-# num = 1
-# f_num = 10
-# img = mData.get_data(num, 0)
-# # 生成模版
-# patterns_str = generate_patterns()
-# patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
-# # base_pattern_str = patterns_str[0:f_num]
-# # base_patterns = patterns[0:f_num]
-# # 第一层的实际模版
-# layer_1 = _single_image_dic(img, patterns_str, patterns, output_real_patterns=True)
-# # 基于特征的映射
-# _size = len(layer_1)
-# layer_based_f = [['' for j in range(_size)] for i in range(_size)]
+mData = MinstData()
+num = 1
+f_num = 10
+img = mData.get_data(num, 0)
+# 生成模版
+patterns_str = generate_patterns()
+patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+dis_mat = _pattern_str_distance_mat(patterns_str)
+# 第一层的实际模版
+layer_1 = _single_image_dic(img, patterns_str, patterns, output_real_patterns=True)
+
+best_features_dic = _load(_n_filename(num))
+best_features = [key for key in best_features_dic][0:f_num]
+
+
+# 更新第一层
+
+updated_layer = _updat_layer(layer_1, best_features, dis_mat)
 
 
 
