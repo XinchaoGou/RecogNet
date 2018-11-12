@@ -285,17 +285,43 @@ def _run_train_data(f_stop_num = 50):
 def _n_filename(_num):
     return '../dict/sort_dic_' + str(_num) +'.txt'
 
-# TODO 计算全部 1 层特征之间的相似矩阵
+# 从特征的字符串找出特征编号
+def fstr_to_index(_feature_str):
+    _str = '0b'+_feature_str
+    return int(_str,2)
+
+# TODO
+# 只用计算一半,不是矩阵形式，第一行256个，第二行255个，很行依次递减一
+# 计算全部 1 层特征之间的相似矩阵,大小为 256 *256
+# _all_f_mat[i][j]表示 特征i 与 特征j 的相似度
 def _pattern_str_distance_mat():
     # 生成模版
     _patterns_str = generate_patterns()
-    _patterns = [str_1_to_mat(_patterns_str[i]) for i in range(len(_patterns_str))]
-    _all_feature_num = len(_patterns_str)
-    _all_f_mat = [[0. for j in range(_all_feature_num)] for i in range(_all_feature_num)]
-    for i in range(_all_feature_num):
-        for j in range(_all_feature_num):
-            _all_f_mat[i][j] = str_to_matstr_or_compare(_patterns_str[i], _patterns_str[j])
+    _all_feature_num = len( _patterns_str)
+    _all_f_mat = [[str_to_matstr_or_compare(_patterns_str[i], _patterns_str[j]) for j in range(i, _all_feature_num)] for i in range(_all_feature_num)]
+    # if (_str_1 is not None) and (_str_2 is not None):
+    #     # 因为第一层比较少，存一半矩阵所以要从特征的字符串先找出特征编号
+    #     ind_1 = fstr_to_index(_str_1)
+    #     ind_2 = fstr_to_index(_str_2)
+    #     if ind_1 < ind_2 :
+    #         _min_ind,_max_ind = ind_1,ind_2
+    #     else:
+    #         _min_ind, _max_ind = ind_2, ind_1
+    #     return _all_f_mat[_min_ind][_max_ind]
     return _all_f_mat
+
+# 查表两个特征之间距离,因为矩阵只有一半注意索引
+def dis_from_mat(_str_1,_str_2,_all_f_mat = _pattern_str_distance_mat()):
+    ind_1 = fstr_to_index(_str_1)
+    ind_2 = fstr_to_index(_str_2)
+    print(ind_1,ind_2)
+    if ind_1 < ind_2:
+        _min_ind, _max_ind = ind_1, ind_2
+    else:
+        _min_ind, _max_ind = ind_2, ind_1
+    print(_max_ind, _min_ind)
+    return _all_f_mat[_min_ind][_max_ind - _min_ind]
+    return
 
 # 第一层修正，根据给定的基，生成修正图像
 # 根据前 _f_num 个特征为基
@@ -312,6 +338,12 @@ def _show_img(_img, _f_num = 10, _num = None):
     # layer_1 = _single_image_dic(_img, _pattern_strs, _patterns, output_real_patterns=True)
 
     return _img
+
+
+mat = _pattern_str_distance_mat()
+str_1 = '000111000'
+str_2 = '011011011'
+dis = dis_from_mat(str_1,str_2,_all_f_mat = _pattern_str_distance_mat())
 
 
 # _run_train_data(5)
