@@ -4,6 +4,7 @@ import json
 import time
 import os
 
+from PIL import Image
 from read_data import MinstData
 
 dim = 3
@@ -86,17 +87,38 @@ def str_1_to_mat(_str):
 # [['0','1','0'],
 #  ['0','1','0'],
 #  ['0','1','0']]
-def str_to_matstr(_str,_k):
+# 这样递归的设计可以便于分布式计算，所以没有直接进行二进制字符串的比较
+# 而且字串相同的可以直接返回1，不用计算所有，便于加速
+# 因为每一层建立再有限个低层模版上，作用更强
+# 有一个字符串则返回字符矩阵
+# 有两个字符串则比较相似度
+def str_to_matstr_or_compare(_str, _str_2=None):
     _len = len(_str)
+    _k = _len// (dim * dim)
+    # TODO 检查字符串长度是否符合要求 _len % (dim * dim) == 0
+    # TODO 如果两个模版的长度不同（不在同一层），可以用其他办法比较
     _block_n = dim * dim
     _block_size = _len//_block_n
     _mats = []
     if _k == 1:
         _mats = [[_str[dim * i + j] for j in range(dim)] for i in range(dim)]
+        if _str_2 is not None:
+            _mats_2 = str_to_matstr_or_compare(_str_2)
+            _not_xor = lambda x,y: 1 if x == y else 0
+            _xor_mat = [[_not_xor(_mats[i][j],_mats_2[i][j]) for j in range(dim)] for i in range(dim)]
+            return sum(map(sum, _xor_mat))/(dim * dim)
     else:
         # 把二进制字符串分成9(dim * dim)块，迭代到低一层解码为字符矩阵
         _str_s = [ _str[ (k*_block_n) : (k*_block_n + _block_size)] for k in range(_block_n)]
-        _mats = [[ str_to_matstr(_str_s[dim*i + j], _k -1) for j in range(dim)] for i in range(dim)]
+        _mats = [[str_to_matstr_or_compare(_str_s[dim * i + j]) for j in range(dim)] for i in range(dim)]
+        if _str_2 is not None:
+            if _str == _str_2:
+                return 1
+            _mats_2 = str_to_matstr_or_compare(_str_2)
+            _str_s_2 = [ _str_2[ (k*_block_n) : (k*_block_n + _block_size)] for k in range(_block_n)]
+            _xor_mat = [[str_to_matstr_or_compare(_str_s[dim * i + j], _str_s_2[dim * i + j]) for j in range(dim)] for i in range(dim)]
+            return sum(map(sum, _xor_mat)) / (dim * dim)
+
     return _mats
 
 # # 将第1层的矩阵模版，转换为十进制数字的字符串
@@ -178,7 +200,7 @@ def _save(m_dic, _file_name = '../dict/sort_dic.txt'):
     return
 
 # 加载 频次统计文件 到 字典数据
-def _load(_file_name = '../dict/sort_dic.txt'):
+def _load(_file_name = '../dict/all_frequent_dict.txt'):
     if os.path.exists(_file_name):
         with open(_file_name, 'rb') as loadfile:
             load_dic = json.load(loadfile)
@@ -208,8 +230,9 @@ def _list_to_dict(_list):
 # 如果有 _pre_dic 字段 则将 该样本频次字典 与 历史频次字典 合并
 # _pattern_strs 是特征 为字符串 形式的特征集，list类型
 # _patterns 是 特征 为矩阵 形式的特征集，list类型
-# 返回值是dic类型
-def _single_image_dic(_img, _pattern_strs, _patterns, **_pre_dic):
+# 返回值是dic类型,
+# 如果 output_real_patterns = True 则返回 图像在第一组基下的 第一层网络
+def _single_image_dic(_img, _pattern_strs, _patterns, output_real_patterns = False, **_pre_dic):
     blocks = split_block(_img, dim)
     n, m = _size(blocks)
     # 特征频次统计字典,有则在原来基础上添加，无则输出当前图的统计字典
@@ -217,6 +240,9 @@ def _single_image_dic(_img, _pattern_strs, _patterns, **_pre_dic):
         p_dic = _pre_dic
     else:
         p_dic = {}
+
+    if output_real_patterns:
+        _p_real_patterns = [ [ '' for j in range(m)] for i in range(n)]
 
     for n_index in range(n):
         for m_index in range(m):
@@ -231,11 +257,13 @@ def _single_image_dic(_img, _pattern_strs, _patterns, **_pre_dic):
                     p_max = p
                     p_max_index = p_index
 
-            # 也可以用矩阵形式，或者字符串形式互相转换，但是考虑这样在大量调用时，计算量太大
-            # 所以这里直接索引来得到
             _max_pattern_str = _pattern_strs[p_max_index]
+            if output_real_patterns:
+                _p_real_patterns[n_index][m_index] = _max_pattern_str
             # dit.get 优化
             p_dic[_max_pattern_str] = p_dic.get(_max_pattern_str, 0) + 1
+    if output_real_patterns:
+        return _p_real_patterns
     return p_dic
 
 # 运行训练样本数据，生成频次字典
@@ -245,7 +273,7 @@ def _run_train_data(f_stop_num = 50):
     # 生成模版
     patterns_str = generate_patterns()
     patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
-    for i in range(2):
+    for i in range(10):
         p_dic = static_first_layer(i, patterns_str, patterns, f_stop=f_stop_num)
         sort_dic = show_most_patterns(p_dic, f_stop_num, 'dict', True)
         _cDict_to_allDict(sort_dic)
@@ -253,10 +281,72 @@ def _run_train_data(f_stop_num = 50):
     print('运行时间' + str(time.time() - start))
     return
 
-_run_train_data(5)
+# 根据给定数字，生成对应文件路径
+def _n_filename(_num):
+    return '../dict/sort_dic_' + str(_num) +'.txt'
+
+# TODO 计算特征之间的相似矩阵
+def _pattern_str_distance_mat(_patter_1, _patter_2):
+
+    return
+
+# 第一层修正，根据给定的基，生成修正图像
+# 根据前 _f_num 个特征为基
+# 数字 _num 如果给定用对应的特征，否则用全部训练的特征
+# TODO 未完成
+def _show_img(_img, _f_num = 10, _num = None):
+    # # 加载第一层特征字典为dist
+    # _frequent_dict = _load( _n_filename( _num)) if _num is not None else _load()
+    # _f_str_list = [ key for key in _frequent_dict]
+    # _f_patterns = [str_1_to_mat(_f_str_list[i]) for i in range(len(_f_str_list))]
+    #
+    # _pattern_strs = _f_str_list[0:_f_num]
+    # _patterns = _f_patterns[0:_f_num]
+    # layer_1 = _single_image_dic(_img, _pattern_strs, _patterns, output_real_patterns=True)
+
+    return _img
+
+# _run_train_data(5)
+
+# mData = MinstData()
+# num = 1
+# f_num = 10
+# img = mData.get_data(num, 0)
+# # 生成模版
+# patterns_str = generate_patterns()
+# patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+# layer_1 = _single_image_dic(img, patterns_str, patterns, output_real_patterns=True)
+# # 加载第一层特征字典为dist
+# _frequent_dict = _load(_n_filename(num)) if num is not None else _load()
+# _f_str_list = [key for key in _frequent_dict]
+# _f_patterns = [str_1_to_mat(_f_str_list[i]) for i in range(len(_f_str_list))]
+# _pattern_strs = _f_str_list[0:f_num]
+# _patterns = _f_patterns[0:f_num]
 
 
 
+# Image.fromarray(_show_img(img, _num =1)).show()
+
+mData = MinstData()
+num = 1
+f_num = 10
+img = mData.get_data(num, 0)
+# 生成模版
+patterns_str = generate_patterns()
+patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+# base_pattern_str = patterns_str[0:f_num]
+# base_patterns = patterns[0:f_num]
+# 第一层的实际模版
+layer_1 = _single_image_dic(img, patterns_str, patterns, output_real_patterns=True)
+# 基于特征的映射
+_size = len(layer_1)
+layer_based_f = [['' for j in range(_size)] for i in range(_size)]
+# 相似矩阵
+_all_feature_num =  len(patterns_str)
+all_f_mat = [[ 0. for j in range(_all_feature_num)] for i in range(_all_feature_num)]
+for i in range(_all_feature_num):
+    for j in range(_all_feature_num):
+        all_f_mat[i][j] = str_to_matstr_or_compare(patterns_str[i], patterns_str[j])
 
 
 
