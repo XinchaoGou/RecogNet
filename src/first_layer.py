@@ -285,10 +285,17 @@ def _run_train_data(f_stop_num = 50):
 def _n_filename(_num):
     return '../dict/sort_dic_' + str(_num) +'.txt'
 
-# TODO 计算特征之间的相似矩阵
-def _pattern_str_distance_mat(_patter_1, _patter_2):
-
-    return
+# TODO 计算全部 1 层特征之间的相似矩阵
+def _pattern_str_distance_mat():
+    # 生成模版
+    _patterns_str = generate_patterns()
+    _patterns = [str_1_to_mat(_patterns_str[i]) for i in range(len(_patterns_str))]
+    _all_feature_num = len(_patterns_str)
+    _all_f_mat = [[0. for j in range(_all_feature_num)] for i in range(_all_feature_num)]
+    for i in range(_all_feature_num):
+        for j in range(_all_feature_num):
+            _all_f_mat[i][j] = str_to_matstr_or_compare(_patterns_str[i], _patterns_str[j])
+    return _all_f_mat
 
 # 第一层修正，根据给定的基，生成修正图像
 # 根据前 _f_num 个特征为基
@@ -305,6 +312,7 @@ def _show_img(_img, _f_num = 10, _num = None):
     # layer_1 = _single_image_dic(_img, _pattern_strs, _patterns, output_real_patterns=True)
 
     return _img
+
 
 # _run_train_data(5)
 
@@ -327,26 +335,21 @@ def _show_img(_img, _f_num = 10, _num = None):
 
 # Image.fromarray(_show_img(img, _num =1)).show()
 
-mData = MinstData()
-num = 1
-f_num = 10
-img = mData.get_data(num, 0)
-# 生成模版
-patterns_str = generate_patterns()
-patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
-# base_pattern_str = patterns_str[0:f_num]
-# base_patterns = patterns[0:f_num]
-# 第一层的实际模版
-layer_1 = _single_image_dic(img, patterns_str, patterns, output_real_patterns=True)
-# 基于特征的映射
-_size = len(layer_1)
-layer_based_f = [['' for j in range(_size)] for i in range(_size)]
-# 相似矩阵
-_all_feature_num =  len(patterns_str)
-all_f_mat = [[ 0. for j in range(_all_feature_num)] for i in range(_all_feature_num)]
-for i in range(_all_feature_num):
-    for j in range(_all_feature_num):
-        all_f_mat[i][j] = str_to_matstr_or_compare(patterns_str[i], patterns_str[j])
+# mData = MinstData()
+# num = 1
+# f_num = 10
+# img = mData.get_data(num, 0)
+# # 生成模版
+# patterns_str = generate_patterns()
+# patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+# # base_pattern_str = patterns_str[0:f_num]
+# # base_patterns = patterns[0:f_num]
+# # 第一层的实际模版
+# layer_1 = _single_image_dic(img, patterns_str, patterns, output_real_patterns=True)
+# # 基于特征的映射
+# _size = len(layer_1)
+# layer_based_f = [['' for j in range(_size)] for i in range(_size)]
+
 
 
 
