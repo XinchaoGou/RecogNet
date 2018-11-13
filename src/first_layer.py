@@ -421,8 +421,9 @@ def _p_img_to_tag(_img,_f_num, _pattern_strs, _patterns, _dic):
     # 计算单个样本的第一层网络实际输出
     _sample_layer_1,_sample_layer_1_conf = _single_image_dic_or_real_patterns(_img, _pattern_strs, _patterns, output_real_patterns = True)
 
-    best_features = list(_dic.keys())[0:_f_num]
-    best_features_value = normalize_value(list(_dic.values())[0:_f_num])
+    # 去掉全0的特征再试试
+    best_features = list(_dic.keys())[1:_f_num]
+    best_features_value = normalize_value(list(_dic.values())[1:_f_num])
 
     _updated_layer, _updated_layer_conf = _updat_layer(_sample_layer_1, best_features, dis_mat)
     # 根据每个区块实际投影误差，区块特征矫正误差，生成矫正后频次图
@@ -451,18 +452,44 @@ def _p_img_to_tag(_img,_f_num, _pattern_strs, _patterns, _dic):
 
     return _similarity
 
+# 输出分类标签
+def _classification(_img,_patterns_str,_patterns):
 
-_run_train_data(100)
+    # 学习到的频次统计图
+    best_dic = [ _load(_n_filename(i)) for i in range(10)]
+    # _p_max = 0
+    # _tag = 0
+    _tag_list = [0 for i in range(10)]
+    for i in range(10):
+        best_features_dic = best_dic[i]
+        _p = _p_img_to_tag(img, f_num, patterns_str, patterns, best_features_dic)
+        _tag_list[i] = _p
+        # if _p > _p_max:
+        #     _p_max = _p
+        #     _tag = i
+    return _tag_list.index(max(_tag_list)),_tag_list
+# _run_train_data(100)
 
-# mData = MinstData()
-# num = 1
-# f_num = 10
-# img = mData.get_data(1, 100)
+mData = MinstData()
+num = 3
+f_num = 50
+img = mData.get_data(num, 300)
+# 生成模版
+patterns_str = generate_patterns()
+patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+start = time.time()
+tag,_tag_list = _classification(img,patterns_str,patterns)
+print('运行时间' + str(time.time() - start))
+print('分类器输出为'+str(tag))
+if tag == num:
+    print('成功')
+else:
+    print('失败')
 # # 生成模版
 # patterns_str = generate_patterns()
 # patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
 # # 学习到的频次统计图
-# best_features_dic = _load(_n_filename(1))
+# best_features_dic = _load(_n_filename(9))
 #
 # p = _p_img_to_tag(img, f_num, patterns_str, patterns, best_features_dic)
 
