@@ -411,19 +411,17 @@ def _show_img(_img, _f_num = 10, _num = None):
 # _dic 是降序排列的频次字典
 # _f_num 是前n个特征基
 # _pattern_strs 和 _patterns 是所有特征的
-def _p_img_to_tag(_img,_f_num, _pattern_strs, _patterns, _dic):
+def _p_img_to_tag(_img,_f_num, _pattern_strs, _patterns, _dic, dis_mat = _pattern_str_distance_mat()):
     # 归一化前几个特征的频次
     def normalize_value(_value_list):
         _sum = sum(_value_list)
         return [_value_list[i]/_sum for i in range(len(_value_list))]
 
-    dis_mat = _pattern_str_distance_mat()
     # 计算单个样本的第一层网络实际输出
     _sample_layer_1,_sample_layer_1_conf = _single_image_dic_or_real_patterns(_img, _pattern_strs, _patterns, output_real_patterns = True)
 
-    # 去掉全0的特征再试试
-    best_features = list(_dic.keys())[1:_f_num]
-    best_features_value = normalize_value(list(_dic.values())[1:_f_num])
+    best_features = list(_dic.keys())[0:_f_num]
+    best_features_value = normalize_value(list(_dic.values())[0:_f_num])
 
     _updated_layer, _updated_layer_conf = _updat_layer(_sample_layer_1, best_features, dis_mat)
     # 根据每个区块实际投影误差，区块特征矫正误差，生成矫正后频次图
@@ -437,7 +435,7 @@ def _p_img_to_tag(_img,_f_num, _pattern_strs, _patterns, _dic):
             _updated_layer_dic[_key] = _updated_layer_dic.get(_key,0) + _real_project_confidence * _change_feature_confidence
 
     # 矫正后的频次图和对应标签学习到的频次图相似度计算
-    # TODO 归一化频次图，用公式算概率
+    # 归一化频次图，用公式算概率
     _sample_features = list(_updated_layer_dic.keys())[0:_f_num]
     _sample_features_value = normalize_value(list(_updated_layer_dic.values())[0:_f_num])
     for i in range(len(_sample_features)):
@@ -448,50 +446,55 @@ def _p_img_to_tag(_img,_f_num, _pattern_strs, _patterns, _dic):
         _best_key = best_features[i]
         _p_beast = best_features_value[i]
         _p_sample = _updated_layer_dic.get(_best_key,0)
-        _similarity +=_p_beast * math.exp( -abs(_p_beast - _p_sample) )
+        # _similarity +=_p_beast * math.exp( -abs(_p_beast - _p_sample) )
+        _similarity += (_p_beast - _p_sample) ** 2
 
-    return _similarity
+    return np.sqrt(_similarity)
 
 # 输出分类标签
-def _classification(_img,_patterns_str,_patterns):
-
-    # 学习到的频次统计图
-    best_dic = [ _load(_n_filename(i)) for i in range(10)]
-    # _p_max = 0
-    # _tag = 0
+def _classification(_img,_patterns_str,_patterns,best_dics_list = None ):
+    if best_dics_list is not None:
+        pass
+    else:
+        best_dics_list = [_load(_n_filename(i)) for i in range(10)]
     _tag_list = [0 for i in range(10)]
+    dis_mat = _pattern_str_distance_mat(_patterns_str)
     for i in range(10):
-        best_features_dic = best_dic[i]
-        _p = _p_img_to_tag(img, f_num, patterns_str, patterns, best_features_dic)
+        best_features_dic = best_dics_list[i]
+        _p = _p_img_to_tag(img, f_num, patterns_str, patterns, best_features_dic,dis_mat)
         _tag_list[i] = _p
-        # if _p > _p_max:
-        #     _p_max = _p
-        #     _tag = i
-    return _tag_list.index(max(_tag_list)),_tag_list
+    # return _tag_list.index(max(_tag_list)),_tag_list
+    return _tag_list.index(min(_tag_list)), _tag_list
 # _run_train_data(100)
 
 mData = MinstData()
-num = 3
-f_num = 50
-img = mData.get_data(num, 300)
+num = 2
+f_num = 100
 # 生成模版
 patterns_str = generate_patterns()
 patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+# 读取认知图
+best_dic_list = [ _load(_n_filename(i)) for i in range(10)]
 start = time.time()
-tag,_tag_list = _classification(img,patterns_str,patterns)
-print('运行时间' + str(time.time() - start))
-print('分类器输出为'+str(tag))
-if tag == num:
-    print('成功')
-else:
-    print('失败')
-# # 生成模版
-# patterns_str = generate_patterns()
-# patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
-# # 学习到的频次统计图
-# best_features_dic = _load(_n_filename(9))
-#
-# p = _p_img_to_tag(img, f_num, patterns_str, patterns, best_features_dic)
+
+success = 0
+fail = 0
+total = 0
+for j in range(400,500,5):
+    total += 1
+    img = mData.get_data(num, j)
+    tag, _tag_list = _classification(img, patterns_str, patterns, best_dics_list = best_dic_list)
+    print('运行时间' + str(time.time() - start))
+    print('分类器输出为' + str(tag))
+    if tag == num:
+        success+=1
+        print('成功率' + str(success/total) + '该样本标签置信率 ' + str(1- _tag_list[tag]) )
+    else:
+        fail+=1
+        print('失败率' + str(fail/total)+ '该样本标签置信率 ' + str(1- _tag_list[tag]))
+
+
+
 
 
 
