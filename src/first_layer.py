@@ -4,6 +4,7 @@ import json
 import time
 import random
 import math
+import copy
 import os
 
 from PIL import Image
@@ -576,26 +577,60 @@ def _features_cluster(_features_dic, _k_class):
     # 所有特征的相似矩阵
     dis_mat = _pattern_str_distance_mat()
 
-    # 初始化 _k 个初始点
-    _k_str = [ _features_strs[random.randint(0, _features_len)] for i in range(_k_class)]
+    # 初始化 _k 个初始点,random 包含首位，所以减一！
+    _k_str = [ _features_strs[random.randint(0, _features_len - 1)] for i in range(_k_class)]
     _k_val = [ 0. for i in range(_k_class)]
+    new_k_str,new_k_val = _singel_stage(_k_str, _k_val)
+    _k_str = copy.deepcopy(new_k_str)
+    _k_val = copy.deepcopy(new_k_val)
+    # _k_str,_k_val=new_k_str,new_k_val
     for i in range(100):
-        new_k_str,new_k_val = _singel_stage(_k_str, _k_val)
+        _k_str, _k_val = _singel_stage(_k_str, _k_val)
         if new_k_str == _k_str:
             break
         else:
-            _k_str=new_k_str
-            _k_val=new_k_val
+            new_k_str =copy.deepcopy(_k_str)
+            new_k_val =copy.deepcopy(_k_val)
     return _key_value_to_new_dic(_k_str, _k_val)
 
 
 
 # _run_train_data(100)
 
-test(2)
+# test(1)
 
-# features_dic = _load(_n_filename(1))
-# p = _features_cluster(features_dic, 10)
+mData = MinstData()
+num = 7
+f_num = 10
+# 生成模版
+patterns_str = generate_patterns()
+patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+# 读取认知图,特征聚类后作为字典
+# p1 = {key: value for key, value in prices.items() if value > 200}
+
+best_dic_list = [ _features_cluster(_load(_n_filename(i)), f_num) for i in range(10)]
+start = time.time()
+
+success = 0
+fail = 0
+total = 0
+for j in range(450, 500, 5):
+    total += 1
+    img = mData.get_data(num, j)
+    tag, _tag_list = _classification(img,f_num, patterns_str, patterns, best_dics_list=best_dic_list)
+    print('运行时间' + str(time.time() - start))
+    print('分类器输出为' + str(tag))
+    if tag == num:
+        success += 1
+        print('成功率' + str(success / total))
+    else:
+        fail += 1
+        _p_real_tag_dis = _tag_list[num]
+        _p_output_tag_dis = _tag_list[tag]
+        _p_max_dis = max(_tag_list)
+        _p_confidence = abs(_p_real_tag_dis - _p_output_tag_dis)/_p_max_dis
+        print('失败率' + str(fail / total) + '\t理论置信率 ' + str(1 - _p_confidence))
+
 
 
 
