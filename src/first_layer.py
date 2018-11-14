@@ -453,7 +453,7 @@ def _p_img_to_tag(_img,_f_num, _pattern_strs, _patterns, _dic, dis_mat = _patter
     return np.sqrt(_similarity)
 
 # 输出分类标签
-def _classification(_img,_patterns_str,_patterns,best_dics_list = None ):
+def _classification(_img,_f_num,_patterns_str,_patterns,best_dics_list = None ):
     if best_dics_list is not None:
         pass
     else:
@@ -462,14 +462,14 @@ def _classification(_img,_patterns_str,_patterns,best_dics_list = None ):
     dis_mat = _pattern_str_distance_mat(_patterns_str)
     for i in range(10):
         best_features_dic = best_dics_list[i]
-        _p = _p_img_to_tag(_img, f_num, patterns_str, patterns, best_features_dic,dis_mat)
+        _p = _p_img_to_tag(_img, _f_num, _patterns_str, _patterns, best_features_dic,dis_mat)
         _tag_list[i] = _p
     return _tag_list.index(min(_tag_list)), _tag_list
 
 # TODO 未完成 测试分类器对数字 num 成功率
 def test(_num):
     mData = MinstData()
-    num = 1
+    num = _num
     f_num = 10
     # 生成模版
     patterns_str = generate_patterns()
@@ -484,19 +484,21 @@ def test(_num):
     for j in range(450, 500, 5):
         total += 1
         img = mData.get_data(num, j)
-        tag, _tag_list = _classification(img, patterns_str, patterns, best_dics_list=best_dic_list)
+        tag, _tag_list = _classification(img,f_num, patterns_str, patterns, best_dics_list=best_dic_list)
         print('运行时间' + str(time.time() - start))
         print('分类器输出为' + str(tag))
         if tag == num:
             success += 1
-            print('成功率' + str(success / total))
+            _p_real_tag_dis = _tag_list[0]
+            _p_max_dis = max(_tag_list)
+            print('成功率' + str(success / total) + '\t理论置信率 ' + str(_p_real_tag_dis/_p_max_dis))
         else:
             fail += 1
             _p_real_tag_dis = _tag_list[0]
             _p_output_tag_dis = _tag_list[tag]
             _p_max_dis = max(_tag_list)
             _p_confidence = abs(_p_real_tag_dis - _p_output_tag_dis) / _p_max_dis
-            print('失败率' + str(fail / total) + '\t算法置信率 ' + str(1 - _p_confidence))
+            print('失败率' + str(fail / total) + '\t理论置信率 ' + str(1 - _p_confidence))
     return
 
 # 特征聚类,聚为 _k 类
@@ -590,7 +592,7 @@ def _features_cluster(_features_dic, _k_class):
 
 # _run_train_data(100)
 
-test(1)
+test(2)
 
 # features_dic = _load(_n_filename(1))
 # p = _features_cluster(features_dic, 10)
