@@ -2,6 +2,7 @@ import numpy as np
 import cmath as cm
 import json
 import time
+import random
 import math
 import os
 
@@ -407,7 +408,7 @@ def _show_img(_img, _f_num = 10, _num = None):
     Image.fromarray(img).show()
     return img
 
-# TODO 根据样本，第一层网络的输出，计算频次统计图，与学习到的对应标签的频次统计图计算相似度
+# 根据样本，第一层网络的输出，计算频次统计图，与学习到的对应标签的频次统计图计算相似度
 # _dic 是降序排列的频次字典
 # _f_num 是前n个特征基
 # _pattern_strs 和 _patterns 是所有特征的
@@ -461,39 +462,138 @@ def _classification(_img,_patterns_str,_patterns,best_dics_list = None ):
     dis_mat = _pattern_str_distance_mat(_patterns_str)
     for i in range(10):
         best_features_dic = best_dics_list[i]
-        _p = _p_img_to_tag(img, f_num, patterns_str, patterns, best_features_dic,dis_mat)
+        _p = _p_img_to_tag(_img, f_num, patterns_str, patterns, best_features_dic,dis_mat)
         _tag_list[i] = _p
-    # return _tag_list.index(max(_tag_list)),_tag_list
     return _tag_list.index(min(_tag_list)), _tag_list
+
+# TODO 未完成 测试分类器对数字 num 成功率
+def test(_num):
+    mData = MinstData()
+    num = 1
+    f_num = 10
+    # 生成模版
+    patterns_str = generate_patterns()
+    patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+    # 读取认知图,特征聚类后作为字典
+    best_dic_list = [ _features_cluster(_load(_n_filename(i)), f_num) for i in range(10)]
+    start = time.time()
+
+    success = 0
+    fail = 0
+    total = 0
+    for j in range(450, 500, 5):
+        total += 1
+        img = mData.get_data(num, j)
+        tag, _tag_list = _classification(img, patterns_str, patterns, best_dics_list=best_dic_list)
+        print('运行时间' + str(time.time() - start))
+        print('分类器输出为' + str(tag))
+        if tag == num:
+            success += 1
+            print('成功率' + str(success / total))
+        else:
+            fail += 1
+            _p_real_tag_dis = _tag_list[0]
+            _p_output_tag_dis = _tag_list[tag]
+            _p_max_dis = max(_tag_list)
+            _p_confidence = abs(_p_real_tag_dis - _p_output_tag_dis) / _p_max_dis
+            print('失败率' + str(fail / total) + '\t算法置信率 ' + str(1 - _p_confidence))
+    return
+
+# 特征聚类,聚为 _k 类
+def _features_cluster(_features_dic, _k_class):
+    def normalize_value(_value_list):
+        _sum = sum(_value_list)
+        return [_value_list[i]/_sum for i in range(len(_value_list))]
+
+    # 将给定特征和其权重累加到总和里,输入输出都是list
+    def sum_features(_fmat_0,_fmat_1):
+        _mat_0 = np.array(_fmat_0)
+        _mat_1 = np.array(_fmat_1)
+        return (_mat_0+_mat_1).tolist()
+
+    # 将mat归一化，根据给定归一化的模版，生成对应的字符串
+    def mat_to_fstr(_mat, _threshold):
+        _str = ''
+        for i in range(dim):
+            for j in range(dim):
+                _mat[i][j]
+                if _mat[i][j] >= _threshold/2:
+                    _str += '1'
+                else:
+                    _str += '0'
+        return _str
+
+    # 将给入的 特征基 收敛到给定的 种子
+    def _singel_stage(_str,_val):
+        # 用来存储 每个样本的标签对应特征种子的索引，是 _str 中的index
+        _nearest_k = [0 for i in range(_features_len)]
+
+        for i in range(len(_features_strs)):
+            _p_list = [0. for k in range(_k_class)]
+            for _k in range(_k_class):
+                _k_feature = _str[_k]
+                _feature = _features_strs[i]
+                _p_list[_k] = dis_from_mat(_k_feature, _feature, dis_mat)
+            # 找到该特征对应的种子
+            _nearest_k[i] = _p_list.index(max(_p_list))
+
+        # 下一步所有种子相同的，计算加权平均值，生成特征和对应权重，生成新的字典
+        for _k in range(_k_class):
+            _k_mean_mat = [[0, 0, 0],
+                           [0, 0, 0],
+                           [0, 0, 0]]
+            _k_num = 0
+            _k_v = 0
+            # 遍历所有特征对应的种子标签是 _k 的特征
+            for i in range(len(_nearest_k)):
+                # 如果特征对应的种子标签是 _k
+                if _nearest_k[i] == _k:
+                    _feature = _features_strs[i]
+                    _feature_value = _features_value[i]
+                    _k_mean_mat = sum_features(_k_mean_mat, str_1_to_mat(_feature))
+                    _k_v += _feature_value
+                    _k_num += 1
+            _str[_k] = mat_to_fstr(_k_mean_mat, _k_num)
+            _val[_k] = _k_v
+        return _str, _val
+
+    # 根据给定的key和value的列表，生成字典
+    def _key_value_to_new_dic(_key_list,_value_list):
+        _dic = {}
+        # TODO 长度检查
+        _len = len(_key_list)
+        for i in range(_len):
+            _f = _key_list[i]
+            _v = _value_list[i]
+            _dic[_f] = _v
+        return _dic
+
+    _features_strs = list(_features_dic.keys())
+    _features_value = normalize_value(list(_features_dic.values()))
+    _features_len = len(_features_strs)
+    # 所有特征的相似矩阵
+    dis_mat = _pattern_str_distance_mat()
+
+    # 初始化 _k 个初始点
+    _k_str = [ _features_strs[random.randint(0, _features_len)] for i in range(_k_class)]
+    _k_val = [ 0. for i in range(_k_class)]
+    for i in range(100):
+        new_k_str,new_k_val = _singel_stage(_k_str, _k_val)
+        if new_k_str == _k_str:
+            break
+        else:
+            _k_str=new_k_str
+            _k_val=new_k_val
+    return _key_value_to_new_dic(_k_str, _k_val)
+
+
+
 # _run_train_data(100)
 
-mData = MinstData()
-num = 2
-f_num = 100
-# 生成模版
-patterns_str = generate_patterns()
-patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
-# 读取认知图
-best_dic_list = [ _load(_n_filename(i)) for i in range(10)]
-start = time.time()
+test(1)
 
-success = 0
-fail = 0
-total = 0
-for j in range(400,500,5):
-    total += 1
-    img = mData.get_data(num, j)
-    tag, _tag_list = _classification(img, patterns_str, patterns, best_dics_list = best_dic_list)
-    print('运行时间' + str(time.time() - start))
-    print('分类器输出为' + str(tag))
-    if tag == num:
-        success+=1
-        print('成功率' + str(success/total) + '该样本标签置信率 ' + str(1- _tag_list[tag]) )
-    else:
-        fail+=1
-        print('失败率' + str(fail/total)+ '该样本标签置信率 ' + str(1- _tag_list[tag]))
-
-
+# features_dic = _load(_n_filename(1))
+# p = _features_cluster(features_dic, 10)
 
 
 
