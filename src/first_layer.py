@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('TkAgg')
 import numpy as np
 import cmath as cm
 import json
@@ -9,6 +11,8 @@ import os
 
 from PIL import Image
 from read_data import MinstData
+
+
 
 dim = 3
 pixel = 255
@@ -208,7 +212,7 @@ def _save(m_dic, _file_name = '../dict/sort_dic.txt'):
     return
 
 # 加载 频次统计文件 到 字典数据
-def _load(_file_name = '../dict/all_frequent_dict.txt'):
+def load(_file_name ='../dict/all_frequent_dict.txt'):
     if os.path.exists(_file_name):
         with open(_file_name, 'rb') as loadfile:
             load_dic = json.load(loadfile)
@@ -221,7 +225,7 @@ def _load(_file_name = '../dict/all_frequent_dict.txt'):
 # 增加当前频次统计字典的数据 到 总的频次统计数据
 def _cDict_to_allDict(m_dic, _all_file_name = '../dict/all_frequent_dict.txt'):
 
-    _all_frequent_dict = _load(_all_file_name)
+    _all_frequent_dict = load(_all_file_name)
 
     for key, value in m_dic.items():
         _all_frequent_dict[key]= _all_frequent_dict.get(key,0) + value
@@ -291,7 +295,7 @@ def _run_train_data(f_stop_num = 50):
     return
 
 # 根据给定数字，生成对应文件路径
-def _n_filename(_num):
+def n_filename(_num):
     return '../dict/sort_dic_' + str(_num) +'.txt'
 
 # 从特征的字符串找出特征编号
@@ -387,7 +391,7 @@ def _show_img(_img, _f_num = 10, _num = None):
     # 第一层的实际模版,及对应概率
     layer_1, Layer_1_p = _single_image_dic_or_real_patterns(img, patterns_str, patterns, output_real_patterns=True)
 
-    best_features_dic = _load(_n_filename(num))
+    best_features_dic = load(n_filename(num))
     best_features = [key for key in best_features_dic][0:f_num]
 
     # 更新第一层
@@ -458,7 +462,7 @@ def _classification(_img,_f_num,_patterns_str,_patterns,best_dics_list = None ):
     if best_dics_list is not None:
         pass
     else:
-        best_dics_list = [_load(_n_filename(i)) for i in range(10)]
+        best_dics_list = [load(n_filename(i)) for i in range(10)]
     _tag_list = [0 for i in range(10)]
     dis_mat = _pattern_str_distance_mat(_patterns_str)
     for i in range(10):
@@ -476,7 +480,7 @@ def test(_num):
     patterns_str = generate_patterns()
     patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
     # 读取认知图,特征聚类后作为字典
-    best_dic_list = [ _features_cluster(_load(_n_filename(i)), f_num) for i in range(10)]
+    best_dic_list = [_features_cluster(load(n_filename(i)), f_num) for i in range(10)]
     start = time.time()
 
     success = 0
@@ -593,48 +597,43 @@ def _features_cluster(_features_dic, _k_class):
             new_k_val =copy.deepcopy(_k_val)
     return _key_value_to_new_dic(_k_str, _k_val)
 
+def _history():
+    # _run_train_data(100)
 
+    # test(1)
 
-# _run_train_data(100)
+    mData = MinstData()
+    num = 7
+    f_num = 10
+    # 生成模版
+    patterns_str = generate_patterns()
+    patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
+    # 读取认知图,特征聚类后作为字典
+    # p1 = {key: value for key, value in prices.items() if value > 200}
 
-# test(1)
+    best_dic_list = [_features_cluster(load(n_filename(i)), f_num) for i in range(10)]
+    start = time.time()
 
-mData = MinstData()
-num = 7
-f_num = 10
-# 生成模版
-patterns_str = generate_patterns()
-patterns = [str_1_to_mat(patterns_str[i]) for i in range(len(patterns_str))]
-# 读取认知图,特征聚类后作为字典
-# p1 = {key: value for key, value in prices.items() if value > 200}
-
-best_dic_list = [ _features_cluster(_load(_n_filename(i)), f_num) for i in range(10)]
-start = time.time()
-
-success = 0
-fail = 0
-total = 0
-for j in range(450, 500, 5):
-    total += 1
-    img = mData.get_data(num, j)
-    tag, _tag_list = _classification(img,f_num, patterns_str, patterns, best_dics_list=best_dic_list)
-    print('运行时间' + str(time.time() - start))
-    print('分类器输出为' + str(tag))
-    if tag == num:
-        success += 1
-        print('成功率' + str(success / total))
-    else:
-        fail += 1
-        _p_real_tag_dis = _tag_list[num]
-        _p_output_tag_dis = _tag_list[tag]
-        _p_max_dis = max(_tag_list)
-        _p_confidence = abs(_p_real_tag_dis - _p_output_tag_dis)/_p_max_dis
-        print('失败率' + str(fail / total) + '\t理论置信率 ' + str(1 - _p_confidence))
-
-
-
-
-
+    success = 0
+    fail = 0
+    total = 0
+    for j in range(450, 500, 5):
+        total += 1
+        img = mData.get_data(num, j)
+        tag, _tag_list = _classification(img, f_num, patterns_str, patterns, best_dics_list=best_dic_list)
+        print('运行时间' + str(time.time() - start))
+        print('分类器输出为' + str(tag))
+        if tag == num:
+            success += 1
+            print('成功率' + str(success / total))
+        else:
+            fail += 1
+            _p_real_tag_dis = _tag_list[num]
+            _p_output_tag_dis = _tag_list[tag]
+            _p_max_dis = max(_tag_list)
+            _p_confidence = abs(_p_real_tag_dis - _p_output_tag_dis) / _p_max_dis
+            print('失败率' + str(fail / total) + '\t理论置信率 ' + str(1 - _p_confidence))
+    return
 
 
 
